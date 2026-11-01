@@ -427,7 +427,15 @@
             });
         }
 
-        function saveVideoBufferToIDB(key, file) {
+        async function saveMediaToIDB(key, blobOrBuffer, type) {
+            try {
+                const db = await openMediaDB();
+                const tx = db.transaction('media', 'readwrite');
+                tx.objectStore('media').put({ buffer: blobOrBuffer, type: type || 'image/jpeg' }, key);
+            } catch(e) {}
+        }
+
+        async function saveVideoBufferToIDB(key, file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = async function(e) {
@@ -604,7 +612,7 @@
             }
             if (parsed.titles) Object.assign(merged.titles, parsed.titles);
             
-            // Proteksi mutlak agar array kolom tidak tertimpa kosong
+            // Proteksi array ketat agar data tidak hilang
             if (Array.isArray(parsed.studios) && parsed.studios.length > 0) merged.studios = parsed.studios;
             if (Array.isArray(parsed.videos) && parsed.videos.length > 0) merged.videos = sanitizeVideosList(parsed.videos);
             if (Array.isArray(parsed.promos) && parsed.promos.length > 0) merged.promos = parsed.promos;
