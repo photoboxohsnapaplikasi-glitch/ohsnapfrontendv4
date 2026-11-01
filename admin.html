@@ -604,7 +604,7 @@
             }
             if (parsed.titles) Object.assign(merged.titles, parsed.titles);
             
-            // Proteksi ketat agar item/kolom tidak tereset kosong saat refresh
+            // Proteksi mutlak agar item/kolom tidak tertimpa kosong
             if (Array.isArray(parsed.studios) && parsed.studios.length > 0) merged.studios = parsed.studios;
             if (Array.isArray(parsed.videos) && parsed.videos.length > 0) merged.videos = sanitizeVideosList(parsed.videos);
             if (Array.isArray(parsed.promos) && parsed.promos.length > 0) merged.promos = parsed.promos;
@@ -1497,7 +1497,7 @@
                         .eq('id', 1)
                         .maybeSingle();
 
-                    if (!error && data && data.data && data.data.promos) {
+                    if (!error && data && data.data && data.data.promos && data.data.promos.length > 0) {
                         const remoteData = data.data;
                         if (!cmsData.lastUpdated || (remoteData.lastUpdated && remoteData.lastUpdated > cmsData.lastUpdated)) {
                             cmsData = mergeWithDefault(remoteData);
