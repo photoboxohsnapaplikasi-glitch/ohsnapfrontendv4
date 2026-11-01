@@ -604,7 +604,7 @@
             }
             if (parsed.titles) Object.assign(merged.titles, parsed.titles);
             
-            // Proteksi array ketat agar data tidak hilang
+            // Proteksi mutlak agar array kolom tidak tertimpa kosong
             if (Array.isArray(parsed.studios) && parsed.studios.length > 0) merged.studios = parsed.studios;
             if (Array.isArray(parsed.videos) && parsed.videos.length > 0) merged.videos = sanitizeVideosList(parsed.videos);
             if (Array.isArray(parsed.promos) && parsed.promos.length > 0) merged.promos = parsed.promos;
@@ -1425,7 +1425,6 @@
                 body: JSON.stringify(cmsData)
             }).catch(() => {});
 
-        // Otomatis upsert ke Supabase agar langsung tersinkron ke cloud global
             if (supabaseClient) {
                 try {
                     const { error } = await supabaseClient
@@ -1484,9 +1483,15 @@
             renderAdminTable();
         }
 
-        // Pemuatan awal yang memprioritaskan Cloud Global Supabase dengan aman
+        // Pemuatan Aman: Prioritaskan data lokal yang sedang aktif, bandingkan dengan timestamp cloud
         document.addEventListener('DOMContentLoaded', async () => {
-            let loadedFromCloud = false;
+            let localData = loadSavedCMS();
+            let idbBackup = await getMediaFromIDB('cms_full_backup');
+            
+            if (idbBackup && idbBackup.lastUpdated && (!localData.lastUpdated || idbBackup.lastUpdated > localData.lastUpdated)) {
+                localData = mergeWithDefault(idbBackup);
+            }
+            cmsData = localData;
 
             if (supabaseClient) {
                 try {
@@ -1497,20 +1502,19 @@
                         .maybeSingle();
 
                     if (!error && data && data.data) {
-                        cmsData = mergeWithDefault(data.data);
-                        saveCMSBackupToIDB(cmsData);
-                        try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
-                        loadedFromCloud = true;
+                        const remoteData = data.data;
+                        const remoteTime = Number(remoteData.lastUpdated || 0);
+                        const localTime = Number(cmsData.lastUpdated || 0);
+
+                        // HANYA ambil dari cloud jika data cloud lebih baru
+                        if (remoteTime > localTime && remoteData.promos && remoteData.promos.length > 0) {
+                            cmsData = mergeWithDefault(remoteData);
+                            saveCMSBackupToIDB(cmsData);
+                            try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
+                        }
                     }
                 } catch (err) {
-                    console.log('Gagal memuat dari cloud, menggunakan cadangan lokal');
-                }
-            }
-
-            if (!loadedFromCloud) {
-                const idbBackup = await getMediaFromIDB('cms_full_backup');
-                if (idbBackup) {
-                    cmsData = mergeWithDefault(idbBackup);
+                    console.log('Menggunakan data lokal');
                 }
             }
 
