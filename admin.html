@@ -604,7 +604,7 @@
             }
             if (parsed.titles) Object.assign(merged.titles, parsed.titles);
             
-            // Proteksi agar data item/kolom tidak tereset kosong saat refresh
+            // Proteksi ketat agar item/kolom tidak tereset kosong saat refresh
             if (Array.isArray(parsed.studios) && parsed.studios.length > 0) merged.studios = parsed.studios;
             if (Array.isArray(parsed.videos) && parsed.videos.length > 0) merged.videos = sanitizeVideosList(parsed.videos);
             if (Array.isArray(parsed.promos) && parsed.promos.length > 0) merged.promos = parsed.promos;
