@@ -1425,6 +1425,7 @@
                 body: JSON.stringify(cmsData)
             }).catch(() => {});
 
+        // Otomatis upsert ke Supabase agar langsung tersinkron ke cloud global
             if (supabaseClient) {
                 try {
                     const { error } = await supabaseClient
@@ -1483,7 +1484,7 @@
             renderAdminTable();
         }
 
-        // Pemuatan awal yang memprioritaskan Cloud Global (Supabase) agar sinkron dengan perangkat lain
+        // Pemuatan awal yang memprioritaskan Cloud Global Supabase dengan aman
         document.addEventListener('DOMContentLoaded', async () => {
             let loadedFromCloud = false;
 
@@ -1495,7 +1496,7 @@
                         .eq('id', 1)
                         .maybeSingle();
 
-                    if (!error && data && data.data && data.data.promos && data.data.promos.length > 0) {
+                    if (!error && data && data.data) {
                         cmsData = mergeWithDefault(data.data);
                         saveCMSBackupToIDB(cmsData);
                         try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
@@ -1506,10 +1507,9 @@
                 }
             }
 
-            // Jika cloud gagal atau kosong, gunakan cadangan lokal
             if (!loadedFromCloud) {
                 const idbBackup = await getMediaFromIDB('cms_full_backup');
-                if (idbBackup && idbBackup.promos && idbBackup.promos.length > 0) {
+                if (idbBackup) {
                     cmsData = mergeWithDefault(idbBackup);
                 }
             }
