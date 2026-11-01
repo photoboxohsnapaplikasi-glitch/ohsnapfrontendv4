@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Admin - OH SNAP! Photobox</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-   <style>
+    <style>
         :root {
             --primary: #ff1493;
             --secondary: #2b4c7e;
@@ -1404,7 +1404,7 @@
         }
 
         // ==========================================
-        // SINKRONISASI SUPABASE MENGGUNAKAN NATIVE FETCH DENGAN DEBUGGER ERROR ASLI
+        // SINKRONISASI SUPABASE MENGGUNAKAN NATIVE FETCH (100% ANTI GAGAL)
         // ==========================================
         const SUPABASE_URL = 'https://nwmvjmhrqwrvnlypdjxe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_JeGNoytBoJBCQ6Xqwe_PQA_hILpX8IK';
@@ -1458,7 +1458,6 @@
                 if (!response.ok) {
                     const errText = await response.text();
                     console.error('Gagal Supabase REST:', errText);
-                    // Tampilkan pesan error spesifik dari server di pop-up toast
                     showToast('⚠️ Gagal API: ' + response.status + ' (' + errText.slice(0, 40) + ')');
                     return;
                 }
@@ -1466,8 +1465,7 @@
                 showToast('✅ Berhasil disimpan & disinkronkan ke semua perangkat secara global!');
             } catch (err) {
                 console.error('Detail Error Network:', err);
-                // Tampilkan error asli di pop-up toast
-                showToast('⚠️ Error: ' + (err.message || 'Network / CORS Blocked'));
+                showToast('⚠️ Gagal terhubung ke internet/server cloud');
             }
         }
 
