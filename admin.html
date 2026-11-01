@@ -1524,7 +1524,7 @@
                         if (!error && data && data.data) {
                             const remoteData = data.data;
                             const remoteTime = Number(remoteData.lastUpdated || 0);
-                            const localTime = Number(cmsData.lastUpdated || 0);
+                            const localTime = Number(cmsData.lastNotFound || 0);
 
                             if (remoteTime > localTime && remoteData.promos && remoteData.promos.length > 0) {
                                 cmsData = mergeWithDefault(remoteData);
