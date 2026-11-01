@@ -925,7 +925,7 @@
             const btnIdEl = document.getElementById('bannerBtnId');
             const btnEnEl = document.getElementById('bannerBtnEn');
             if (btnIdEl && page === 'about') cmsData.banners[page].btnId = btnIdEl.value;
-            if (btnEnEl && page === 'about') cmsData.banners[page].btnEn = btnEnEl.value;
+            if (btnEnEl && page === 'about') cmsData.banners[page].btnEn = btnEnEnEl.value;
 
             const fullIdEl = document.getElementById('bannerFullId');
             const fullEnEl = document.getElementById('bannerFullEn');
@@ -1411,6 +1411,28 @@
         const SUPABASE_KEY = 'sb_publishable_JeGNoytBoJBCQ6Xqwe_PQA_hILpX8IK';
         const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
+        // Fungsi pembersih gambar berat (Base64) agar payload Supabase tidak oversized / error
+        function cleanDataForCloud(obj) {
+            const clone = JSON.parse(JSON.stringify(obj));
+            ['promos', 'studios', 'frames', 'services', 'locations'].forEach(arr => {
+                if (Array.isArray(clone[arr])) {
+                    clone[arr].forEach(item => {
+                        if (item.img && item.img.startsWith('data:image')) {
+                            item.img = ''; // Kosongkan string base64 berat agar tidak melebihi batas request cloud
+                        }
+                    });
+                }
+            });
+            if (clone.banners) {
+                Object.keys(clone.banners).forEach(k => {
+                    if (clone.banners[k].imgUrl && clone.banners[k].imgUrl.startsWith('data:image')) {
+                        clone.banners[k].imgUrl = '';
+                    }
+                });
+            }
+            return clone;
+        }
+
         async function saveAllCMS() {
             updateBannerState();
             updateTitlesState();
@@ -1418,19 +1440,14 @@
             cmsData.lastUpdated = Date.now();
             persistData();
             
-            fetch(`${API_URL}/cms`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(cmsData)
-            }).catch(() => {});
-
             if (supabaseClient) {
                 try {
+                    const cleanPayload = cleanDataForCloud(cmsData);
                     const { error } = await supabaseClient
                         .from('cms_settings')
                         .upsert({ 
                             id: 1, 
-                            data: cmsData, 
+                            data: cleanPayload, 
                             updated_at: new Date().toISOString() 
                         });
 
@@ -1482,9 +1499,8 @@
             renderAdminTable();
         }
 
-        // Pemuatan Instan (0 Detik) + Background Sync ke Supabase Tanpa Menimpa Data Lokal
+        // Pemuatan Instan + Background Sync dari Supabase untuk Sinkronisasi Global
         document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Ambil data lokal seketika agar halaman terbuka instan
             let localData = loadSavedCMS();
             let idbBackup = await getMediaFromIDB('cms_full_backup');
             
@@ -1493,11 +1509,9 @@
             }
             cmsData = localData;
 
-            // 2. Render tampilan admin seketika
             initAllRenders();
             loadResendData();
 
-            // 3. Tarik data dari Supabase di Latar Belakang (Background) untuk sinkronisasi antar perangkat
             if (supabaseClient) {
                 supabaseClient
                     .from('cms_settings')
@@ -1514,7 +1528,7 @@
                                 cmsData = mergeWithDefault(remoteData);
                                 saveCMSBackupToIDB(cmsData);
                                 try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
-                                initAllRenders(); // Perbarui tampilan jika cloud memiliki data terbaru
+                                initAllRenders();
                             }
                         }
                     }).catch(() => {});
