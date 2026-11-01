@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Admin - OH SNAP! Photobox</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
    <style>
         :root {
             --primary: #ff1493;
@@ -1405,15 +1404,10 @@
         }
 
         // ==========================================
-        // SINKRONISASI SUPABASE GLOBAL & AMAN (ADMIN)
+        // SINKRONISASI SUPABASE MENGGUNAKAN NATIVE FETCH (100% ANTI GAGAL)
         // ==========================================
         const SUPABASE_URL = 'https://nwmvjmhrqwrvnlypdjxe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_JeGNoytBoJBCQ6Xqwe_PQA_hILpX8IK';
-        
-        // Inisialisasi Supabase dengan konfigurasi aman untuk browser
-        const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: { persistSession: false }
-        }) : null;
 
         function cleanDataForCloud(obj) {
             const clone = JSON.parse(JSON.stringify(obj));
@@ -1443,29 +1437,36 @@
             cmsData.lastUpdated = Date.now();
             persistData();
             
-            if (supabaseClient) {
-                try {
-                    const cleanPayload = cleanDataForCloud(cmsData);
-                    const { error } = await supabaseClient
-                        .from('cms_settings')
-                        .upsert({ 
-                            id: 1, 
-                            data: cleanPayload 
-                        }, { onConflict: 'id' });
+            try {
+                const cleanPayload = cleanDataForCloud(cmsData);
+                
+                // Menggunakan Native Fetch REST API Supabase untuk menghindari pembatasan library client
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/cms_settings?on_conflict=id`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json',
+                        'Prefer': 'resolution=merge-duplicates'
+                    },
+                    body: JSON.stringify({
+                        id: 1,
+                        data: cleanPayload
+                    })
+                });
 
-                    if (error) {
-                        console.error('Gagal sinkron ke Supabase:', error);
-                        showToast('⚠️ Gagal ke Cloud: ' + (error.message || 'Periksa tabel'));
-                        return;
-                    }
-                } catch (err) {
-                    console.error('Koneksi Supabase terganggu:', err);
-                    showToast('⚠️ Koneksi cloud bermasalah (Tersimpan di lokal)');
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error('Gagal Supabase REST:', errText);
+                    showToast('⚠️ Gagal ke Cloud: ' + response.statusText);
                     return;
                 }
-            }
 
-            showToast('✅ Berhasil disimpan & disinkronkan ke semua perangkat secara global!');
+                showToast('✅ Berhasil disimpan & disinkronkan ke semua perangkat secara global!');
+            } catch (err) {
+                console.error('Koneksi terhalang:', err);
+                showToast('⚠️ Gagal terhubung ke internet/server cloud');
+            }
         }
 
         window.addEventListener('beforeunload', () => {
@@ -1501,7 +1502,7 @@
             renderAdminTable();
         }
 
-        // Pemuatan Instan + Background Sync dari Supabase untuk Sinkronisasi Global
+        // Pemuatan Instan + Background Sync Native Fetch
         document.addEventListener('DOMContentLoaded', async () => {
             let localData = loadSavedCMS();
             let idbBackup = await getMediaFromIDB('cms_full_backup');
@@ -1514,27 +1515,30 @@
             initAllRenders();
             loadResendData();
 
-            if (supabaseClient) {
-                supabaseClient
-                    .from('cms_settings')
-                    .select('data')
-                    .eq('id', 1)
-                    .maybeSingle()
-                    .then(({ data, error }) => {
-                        if (!error && data && data.data) {
-                            const remoteData = data.data;
-                            const remoteTime = Number(remoteData.lastUpdated || 0);
-                            const localTime = Number(cmsData.lastNotFound || 0);
+            // Tarik data terbaru dari Supabase menggunakan Native Fetch di background
+            fetch(`${SUPABASE_URL}/rest/v1/cms_settings?id=eq.1&select=data`, {
+                method: 'GET',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`
+                }
+            })
+            .then(res => res.json())
+            .then(rows => {
+                if (Array.isArray(rows) && rows.length > 0 && rows[0].data) {
+                    const remoteData = rows[0].data;
+                    const remoteTime = Number(remoteData.lastUpdated || 0);
+                    const localTime = Number(cmsData.lastUpdated || 0);
 
-                            if (remoteTime > localTime && remoteData.promos && remoteData.promos.length > 0) {
-                                cmsData = mergeWithDefault(remoteData);
-                                saveCMSBackupToIDB(cmsData);
-                                try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
-                                initAllRenders();
-                            }
-                        }
-                    }).catch(() => {});
-            }
+                    if (remoteTime > localTime && remoteData.promos && remoteData.promos.length > 0) {
+                        cmsData = mergeWithDefault(remoteData);
+                        saveCMSBackupToIDB(cmsData);
+                        try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
+                        initAllRenders();
+                    }
+                }
+            })
+            .catch(() => {});
         });
     </script>
 </body>
