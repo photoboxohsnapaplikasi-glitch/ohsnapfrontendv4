@@ -604,7 +604,7 @@
             }
             if (parsed.titles) Object.assign(merged.titles, parsed.titles);
             
-            // Proteksi mutlak agar item/kolom tidak tertimpa kosong
+            // Proteksi array ketat agar data tidak hilang
             if (Array.isArray(parsed.studios) && parsed.studios.length > 0) merged.studios = parsed.studios;
             if (Array.isArray(parsed.videos) && parsed.videos.length > 0) merged.videos = sanitizeVideosList(parsed.videos);
             if (Array.isArray(parsed.promos) && parsed.promos.length > 0) merged.promos = parsed.promos;
@@ -1406,7 +1406,7 @@
         }
 
         // ==========================================
-        // SINKRONISASI SUPABASE AMAN & STABIL (ADMIN)
+        // SINKRONISASI SUPABASE GLOBAL & AMAN (ADMIN)
         // ==========================================
         const SUPABASE_URL = 'https://nwmvjmhrqwrvnlypdjxe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_JeGNoytBoJBCQ6Xqwe_PQA_hILpX8IK';
@@ -1447,7 +1447,7 @@
                 }
             }
 
-            showToast('✅ Berhasil disimpan & disinkronkan ke semua perangkat!');
+            showToast('✅ Berhasil disimpan & disinkronkan ke semua perangkat secara global!');
         }
 
         window.addEventListener('beforeunload', () => {
@@ -1483,11 +1483,9 @@
             renderAdminTable();
         }
 
+        // Pemuatan awal yang memprioritaskan Cloud Global (Supabase) agar sinkron dengan perangkat lain
         document.addEventListener('DOMContentLoaded', async () => {
-            const idbBackup = await getMediaFromIDB('cms_full_backup');
-            if (idbBackup && idbBackup.promos && idbBackup.promos.length > 0) {
-                cmsData = mergeWithDefault(idbBackup);
-            }
+            let loadedFromCloud = false;
 
             if (supabaseClient) {
                 try {
@@ -1498,19 +1496,21 @@
                         .maybeSingle();
 
                     if (!error && data && data.data && data.data.promos && data.data.promos.length > 0) {
-                        const remoteData = data.data;
-                        if (!cmsData.lastUpdated || (remoteData.lastUpdated && remoteData.lastUpdated > cmsData.lastUpdated)) {
-                            cmsData = mergeWithDefault(remoteData);
-                            saveCMSBackupToIDB(cmsData);
-                            try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
-                        }
-                    } else if (!data) {
-                        await supabaseClient
-                            .from('cms_settings')
-                            .upsert({ id: 1, data: cmsData, updated_at: new Date().toISOString() });
+                        cmsData = mergeWithDefault(data.data);
+                        saveCMSBackupToIDB(cmsData);
+                        try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
+                        loadedFromCloud = true;
                     }
                 } catch (err) {
-                    console.log('Menggunakan data lokal');
+                    console.log('Gagal memuat dari cloud, menggunakan cadangan lokal');
+                }
+            }
+
+            // Jika cloud gagal atau kosong, gunakan cadangan lokal
+            if (!loadedFromCloud) {
+                const idbBackup = await getMediaFromIDB('cms_full_backup');
+                if (idbBackup && idbBackup.promos && idbBackup.promos.length > 0) {
+                    cmsData = mergeWithDefault(idbBackup);
                 }
             }
 
