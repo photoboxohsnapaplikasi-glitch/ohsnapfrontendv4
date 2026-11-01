@@ -1411,7 +1411,7 @@
         const SUPABASE_KEY = 'sb_publishable_JeGNoytBoJBCQ6Xqwe_PQA_hILpX8IK';
         const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-        // Fungsi pembersih gambar berat (Base64) agar payload Supabase kecil, ringan, dan tidak error
+        // Fungsi pembersih gambar berat (Base64) agar payload Supabase kecil dan tidak error
         function cleanDataForCloud(obj) {
             const clone = JSON.parse(JSON.stringify(obj));
             ['promos', 'studios', 'frames', 'services', 'locations'].forEach(arr => {
@@ -1447,13 +1447,12 @@
                         .from('cms_settings')
                         .upsert({ 
                             id: 1, 
-                            data: cleanPayload, 
-                            updated_at: new Date().toISOString() 
+                            data: cleanPayload 
                         });
 
                     if (error) {
                         console.error('Gagal sinkron ke Supabase:', error);
-                        showToast('⚠️ Gagal sinkron ke cloud (Tersimpan di lokal)');
+                        showToast('⚠️ Gagal ke Cloud: ' + (error.message || 'Periksa tabel'));
                         return;
                     }
                 } catch (err) {
