@@ -603,12 +603,15 @@
                 });
             }
             if (parsed.titles) Object.assign(merged.titles, parsed.titles);
+            
+            // Proteksi agar data item/kolom tidak tereset kosong saat refresh
             if (Array.isArray(parsed.studios) && parsed.studios.length > 0) merged.studios = parsed.studios;
             if (Array.isArray(parsed.videos) && parsed.videos.length > 0) merged.videos = sanitizeVideosList(parsed.videos);
             if (Array.isArray(parsed.promos) && parsed.promos.length > 0) merged.promos = parsed.promos;
             if (Array.isArray(parsed.frames) && parsed.frames.length > 0) merged.frames = parsed.frames;
             if (Array.isArray(parsed.services) && parsed.services.length > 0) merged.services = parsed.services;
             if (Array.isArray(parsed.locations) && parsed.locations.length > 0) merged.locations = parsed.locations;
+            
             if (parsed.footer) Object.assign(merged.footer, parsed.footer);
             if (Array.isArray(parsed.admins) && parsed.admins.length > 0) merged.admins = parsed.admins;
             return merged;
@@ -1402,27 +1405,26 @@
             }
         }
 
-// Inisialisasi Supabase Client
+        // ==========================================
+        // SINKRONISASI SUPABASE AMAN & STABIL (ADMIN)
+        // ==========================================
         const SUPABASE_URL = 'https://nwmvjmhrqwrvnlypdjxe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_JeGNoytBoJBCQ6Xqwe_PQA_hILpX8IK';
         const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-        // Fungsi Simpan yang Terhubung ke Supabase & Otomatis Sinkron ke Semua Perangkat
         async function saveAllCMS() {
             updateBannerState();
             updateTitlesState();
             updateFooterState();
-            cmsData.lastUpdated = Date.now(); // Penanda waktu agar perangkat lain tahu ini data terbaru
+            cmsData.lastUpdated = Date.now();
             persistData();
             
-            // Simpan ke backend lokal jika ada
             fetch(`${API_URL}/cms`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(cmsData)
             }).catch(() => {});
 
-            // Kirim data secara online ke Supabase agar langsung diakses device lain
             if (supabaseClient) {
                 try {
                     const { error } = await supabaseClient
@@ -1435,9 +1437,13 @@
 
                     if (error) {
                         console.error('Gagal sinkron ke Supabase:', error);
+                        showToast('⚠️ Gagal sinkron ke cloud (Tersimpan di lokal)');
+                        return;
                     }
                 } catch (err) {
-                    console.error('Kesalahan koneksi Supabase:', err);
+                    console.error('Koneksi Supabase terganggu:', err);
+                    showToast('⚠️ Koneksi cloud bermasalah (Tersimpan di lokal)');
+                    return;
                 }
             }
 
@@ -1477,15 +1483,12 @@
             renderAdminTable();
         }
 
-        // Pemuatan awal dengan pengecekan data online Supabase secara aman (Tidak merusak kolom/tampilan)
         document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Ambil data cadangan lokal terlebih dahulu agar halaman langsung tampil normal tanpa kedip
             const idbBackup = await getMediaFromIDB('cms_full_backup');
-            if (idbBackup && (!cmsData.lastUpdated || (idbBackup.lastUpdated && idbBackup.lastUpdated >= cmsData.lastUpdated))) {
+            if (idbBackup && idbBackup.promos && idbBackup.promos.length > 0) {
                 cmsData = mergeWithDefault(idbBackup);
             }
 
-            // 2. Tarik data terbaru dari Supabase di latar belakang untuk memastikan sinkronisasi antar perangkat
             if (supabaseClient) {
                 try {
                     const { data, error } = await supabaseClient
@@ -1494,26 +1497,23 @@
                         .eq('id', 1)
                         .maybeSingle();
 
-                    if (!error && data && data.data && Object.keys(data.data).length > 0) {
+                    if (!error && data && data.data && data.data.promos) {
                         const remoteData = data.data;
-                        // Jika data online dari perangkat lain lebih baru atau lokal kosong
                         if (!cmsData.lastUpdated || (remoteData.lastUpdated && remoteData.lastUpdated > cmsData.lastUpdated)) {
                             cmsData = mergeWithDefault(remoteData);
                             saveCMSBackupToIDB(cmsData);
                             try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
                         }
                     } else if (!data) {
-                        // Jika tabel Supabase masih kosong, unggah data awal dari PC ini ke server online
                         await supabaseClient
                             .from('cms_settings')
                             .upsert({ id: 1, data: cmsData, updated_at: new Date().toISOString() });
                     }
                 } catch (err) {
-                    console.log('Menggunakan data lokal cadangan');
+                    console.log('Menggunakan data lokal');
                 }
             }
 
-            // 3. Render seluruh elemen halaman satu kali secara utuh
             initAllRenders();
             loadResendData();
         });
