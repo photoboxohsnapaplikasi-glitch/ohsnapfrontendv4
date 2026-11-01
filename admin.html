@@ -427,14 +427,6 @@
             });
         }
 
-        async function saveMediaToIDB(key, blobOrBuffer, type) {
-            try {
-                const db = await openMediaDB();
-                const tx = db.transaction('media', 'readwrite');
-                tx.objectStore('media').put({ buffer: blobOrBuffer, type: type || 'image/jpeg' }, key);
-            } catch(e) {}
-        }
-
         async function saveVideoBufferToIDB(key, file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -612,7 +604,6 @@
             }
             if (parsed.titles) Object.assign(merged.titles, parsed.titles);
             
-            // Proteksi array ketat agar data tidak hilang
             if (Array.isArray(parsed.studios) && parsed.studios.length > 0) merged.studios = parsed.studios;
             if (Array.isArray(parsed.videos) && parsed.videos.length > 0) merged.videos = sanitizeVideosList(parsed.videos);
             if (Array.isArray(parsed.promos) && parsed.promos.length > 0) merged.promos = parsed.promos;
@@ -1491,43 +1482,43 @@
             renderAdminTable();
         }
 
-        // Pemuatan Aman: Prioritaskan data lokal yang sedang aktif, bandingkan dengan timestamp cloud
+        // Pemuatan Instan (0 Detik) + Background Sync ke Supabase Tanpa Menimpa Data Lokal
         document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Ambil data lokal seketika agar halaman terbuka instan
             let localData = loadSavedCMS();
             let idbBackup = await getMediaFromIDB('cms_full_backup');
             
-            if (idbBackup && idbBackup.lastUpdated && (!localData.lastUpdated || idbBackup.lastUpdated > localData.lastUpdated)) {
+            if (idbBackup && idbBackup.lastUpdated && (!localData.lastUpdated || idbBackup.lastUpdated >= localData.lastUpdated)) {
                 localData = mergeWithDefault(idbBackup);
             }
             cmsData = localData;
 
-            if (supabaseClient) {
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('cms_settings')
-                        .select('data')
-                        .eq('id', 1)
-                        .maybeSingle();
-
-                    if (!error && data && data.data) {
-                        const remoteData = data.data;
-                        const remoteTime = Number(remoteData.lastUpdated || 0);
-                        const localTime = Number(cmsData.lastUpdated || 0);
-
-                        // HANYA ambil dari cloud jika data cloud lebih baru
-                        if (remoteTime > localTime && remoteData.promos && remoteData.promos.length > 0) {
-                            cmsData = mergeWithDefault(remoteData);
-                            saveCMSBackupToIDB(cmsData);
-                            try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
-                        }
-                    }
-                } catch (err) {
-                    console.log('Menggunakan data lokal');
-                }
-            }
-
+            // 2. Render tampilan admin seketika
             initAllRenders();
             loadResendData();
+
+            // 3. Tarik data dari Supabase di Latar Belakang (Background) untuk sinkronisasi antar perangkat
+            if (supabaseClient) {
+                supabaseClient
+                    .from('cms_settings')
+                    .select('data')
+                    .eq('id', 1)
+                    .maybeSingle()
+                    .then(({ data, error }) => {
+                        if (!error && data && data.data) {
+                            const remoteData = data.data;
+                            const remoteTime = Number(remoteData.lastUpdated || 0);
+                            const localTime = Number(cmsData.lastUpdated || 0);
+
+                            if (remoteTime > localTime && remoteData.promos && remoteData.promos.length > 0) {
+                                cmsData = mergeWithDefault(remoteData);
+                                saveCMSBackupToIDB(cmsData);
+                                try { localStorage.setItem('ohsnap_cms_data', JSON.stringify(cmsData)); } catch(e){}
+                                initAllRenders(); // Perbarui tampilan jika cloud memiliki data terbaru
+                            }
+                        }
+                    }).catch(() => {});
+            }
         });
     </script>
 </body>
