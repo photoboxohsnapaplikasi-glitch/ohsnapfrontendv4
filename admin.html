@@ -1404,7 +1404,7 @@
         }
 
         // ==========================================
-        // SINKRONISASI SUPABASE MENGGUNAKAN NATIVE FETCH (100% ANTI GAGAL)
+        // SINKRONISASI SUPABASE MENGGUNAKAN NATIVE FETCH DENGAN DEBUGGER ERROR ASLI
         // ==========================================
         const SUPABASE_URL = 'https://nwmvjmhrqwrvnlypdjxe.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_JeGNoytBoJBCQ6Xqwe_PQA_hILpX8IK';
@@ -1440,7 +1440,6 @@
             try {
                 const cleanPayload = cleanDataForCloud(cmsData);
                 
-                // Menggunakan Native Fetch REST API Supabase (POST dengan Prefer return=representation)
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/cms_settings`, {
                     method: 'POST',
                     headers: {
@@ -1459,14 +1458,16 @@
                 if (!response.ok) {
                     const errText = await response.text();
                     console.error('Gagal Supabase REST:', errText);
-                    showToast('⚠️ Gagal ke Cloud: ' + response.statusText);
+                    // Tampilkan pesan error spesifik dari server di pop-up toast
+                    showToast('⚠️ Gagal API: ' + response.status + ' (' + errText.slice(0, 40) + ')');
                     return;
                 }
 
                 showToast('✅ Berhasil disimpan & disinkronkan ke semua perangkat secara global!');
             } catch (err) {
-                console.error('Koneksi terhalang:', err);
-                showToast('⚠️ Gagal terhubung ke internet/server cloud');
+                console.error('Detail Error Network:', err);
+                // Tampilkan error asli di pop-up toast
+                showToast('⚠️ Error: ' + (err.message || 'Network / CORS Blocked'));
             }
         }
 
@@ -1481,7 +1482,7 @@
             const t = document.getElementById('toast'); 
             t.textContent = m; 
             t.style.display='block'; 
-            setTimeout(() => t.style.display='none', 3000); 
+            setTimeout(() => t.style.display='none', 4000); 
         }
 
         function logoutAdmin() { 
