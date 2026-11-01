@@ -473,7 +473,7 @@
             } catch (e) {}
         }
 
-        function compressImageFile(file, maxDim = 650, quality = 0.62) {
+        function compressImageFile(file, maxDim = 450, quality = 0.5) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -754,7 +754,7 @@
             if (!file) return;
             showToast('⏳ Memproses & menyimpan gambar banner...');
             try {
-                const dataUrl = await compressImageFile(file, 900, 0.65);
+                const dataUrl = await compressImageFile(file, 450, 0.5);
                 const page = document.getElementById('bannerPageSelect').value;
                 if (!cmsData.banners[page]) cmsData.banners[page] = {};
                 cmsData.banners[page].imgUrl = dataUrl;
@@ -776,7 +776,7 @@
             if (!file) return;
             showToast('⏳ Memproses & menyimpan Foto About Story...');
             try {
-                const dataUrl = await compressImageFile(file, 800, 0.65);
+                const dataUrl = await compressImageFile(file, 450, 0.5);
                 if (!cmsData.banners.about) cmsData.banners.about = {};
                 cmsData.banners.about.imgUrl = dataUrl;
                 if (!cmsData.banners.home) cmsData.banners.home = {};
@@ -799,7 +799,7 @@
             if (!file) return;
             showToast('⏳ Memproses & menyimpan foto...');
             try {
-                const dataUrl = await compressImageFile(file, 650, 0.62);
+                const dataUrl = await compressImageFile(file, 450, 0.5);
                 cmsData[arrName][index][propName] = dataUrl;
                 inputEl.value = '';
                 persistData();
@@ -1411,14 +1411,14 @@
         const SUPABASE_KEY = 'sb_publishable_JeGNoytBoJBCQ6Xqwe_PQA_hILpX8IK';
         const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
-        // Fungsi pembersih gambar berat (Base64) agar payload Supabase tidak oversized / error
+        // Fungsi pembersih gambar berat (Base64) agar payload Supabase kecil, ringan, dan tidak error
         function cleanDataForCloud(obj) {
             const clone = JSON.parse(JSON.stringify(obj));
             ['promos', 'studios', 'frames', 'services', 'locations'].forEach(arr => {
                 if (Array.isArray(clone[arr])) {
                     clone[arr].forEach(item => {
                         if (item.img && item.img.startsWith('data:image')) {
-                            item.img = ''; // Kosongkan string base64 berat agar tidak melebihi batas request cloud
+                            item.img = ''; 
                         }
                     });
                 }
